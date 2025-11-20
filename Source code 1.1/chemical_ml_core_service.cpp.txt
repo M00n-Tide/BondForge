@@ -1,0 +1,479 @@
+#include <iostream>
+#include <string>
+#include <vector>
+#include <unordered_map>
+#include <unordered_set>
+#include <mutex>
+#include <memory>
+#include <algorithm>
+#include <stdexcept>
+#include <regex>
+
+// 化学机器学习应用软件 - 服务层（负责数据上传、预处理、权限控制等核心功能）
+// 数据结构定义（修正重复定义、命名空间笔误）
+struct DataRecord { 
+    std::string id;                // 数据唯一标识（删除重复定义）
+    std::string content;           // 数据内容（如化学式、分子结构）（删除重复定义）
+    std::string format;            // 数据格式（CSV/JSON/SDF等）（删除重复定义）
+    std::unordered_set<std::string> tags;  // 数据标签集合
+    std::string category;          // 数据分类
+    std::string uploader;          // 上传用户
+    uint64_t timestamp;            // 上传时间戳（删除重复定义）
+}; 
+
+// 数据质量检测类（修正函数体闭合、逻辑完整性）
+class DataQualityChecker { 
+public: 
+    // 格式校验：修正JSON格式判断逻辑、SDF判断条件
+    bool checkFormat(const std::string& content, const std::string& format) { 
+        if (content.empty()) return false; 
+        if (format == "CSV") { 
+            return content.find(',') != std::string::npos;  // CSV需包含逗号
+        } else if (format == "JSON") { 
+            return !content.empty() && content.front() == '{' && content.back() == '}';  // 完整JSON判断
+        } else if (format == "SDF") { 
+            return content.size() > 3 && content.find("$$$$") != std::string::npos;  // SDF以"$$$$"结尾
+        }
+        return false;  // 不支持的格式
+    }
+
+    // 标签校验：修正正则匹配逻辑
+    bool checkTags(const std::unordered_set<std::string>& tags) { 
+        std::regex r("^[a-zA-Z0-9_]+$");  // 仅允许字母、数字、下划线
+        for (const auto& tag : tags) { 
+            if (tag.empty() || !std::regex_match(tag, r)) { 
+                return false; 
+            }
+        }
+        return true;
+    }
+
+    // 分类校验：修正长度判断逻辑
+    bool checkCategory(const std::string& category) {
+        return !category.empty() && category.size() <= 100;  // 非空且长度≤100
+    }
+}; 
+
+// 权限管理类（修正线程安全、函数逻辑）
+class PermissionManager { 
+public: 
+    enum class Role { ADMIN, USER, GUEST };  // 权限角色
+private: 
+    std::unordered_map<std::string, Role> userRoles;  // 用户名-角色映射
+    std::mutex mutex_;  // 线程安全锁
+public: 
+    // 构造函数：初始化默认用户（admin/guest）
+    PermissionManager() { 
+        userRoles["admin"] = Role::ADMIN; 
+        userRoles["guest"] = Role::GUEST; 
+    }
+
+    // 设置用户角色：修正锁的作用域
+    void setUserRole(const std::string& username, Role role) { 
+        std::lock_guard<std::mutex> lock(mutex_); 
+        userRoles[username] = role;
+    }
+
+    // 获取用户角色：修正线程安全（先加锁再查询）
+    Role getUserRole(const std::string& username) { 
+        std::lock_guard<std::mutex> lock(mutex_); 
+        auto it = userRoles.find(username); 
+        return (it != userRoles.end()) ? it->second : Role::GUEST;
+    }
+
+    // 上传权限判断：ADMIN/USER可上传
+    bool canUpload(const std::string& username) { 
+        Role r = getUserRole(username); 
+        return (r == Role::ADMIN || r == Role::USER); 
+    }
+
+    // 访问权限判断：ADMIN/USER无分类限制，GUEST仅可访问public
+    bool canAccess(const std::string& username, const std::string& category) { 
+        Role r = getUserRole(username);
+        if (r == Role::ADMIN || r == Role::USER) return true; 
+        if (r == Role::GUEST) return (category == "public"); 
+        return false;
+    }
+
+    // 修改权限判断：ADMIN或数据上传者可修改
+    bool canModify(const std::string& username, const DataRecord& data) { 
+        Role r = getUserRole(username);
+        if (r == Role::ADMIN) return true; 
+        return (r == Role::USER && data.uploader == username); 
+    }
+};
+
+// 历史数据存储类（修正锁的使用、函数逻辑）
+class HistoryStorage { 
+private: 
+    std::vector<DataRecord> history;  // 历史数据列表
+    std::mutex mutex_;                // 线程安全锁
+public:
+    // 添加历史记录：修正锁的作用域
+    void addHistory(const DataRecord& record) { 
+        std::lock_guard<std::mutex> lock(mutex_); 
+        history.push_back(record);
+    }
+
+    // 查询历史记录：按ID筛选，修正遍历逻辑
+    std::vector<DataRecord> queryHistory(const std::string& id) { 
+        std::lock_guard<std::mutex> lock(mutex_); 
+        std::vector<DataRecord> result; 
+        for (const auto& rec : history) { 
+            if (rec.id == id) { 
+                result.push_back(rec); 
+            }
+        }
+        return result; 
+    } 
+}; 
+
+// 数据格式转换类（修正字符串拼接逻辑）
+class DataFormatConverter { 
+public: 
+    // 转换为CSV格式：修正标签拼接逻辑
+    std::string convertToCSV(const DataRecord& data) { 
+        std::string tags_str; 
+        for (const auto& tag : data.tags) { 
+            if (!tags_str.empty()) tags_str += ";"; 
+            tags_str += tag; 
+        }
+        return data.id + "," + data.content + "," + data.category + "," + tags_str; 
+    }
+
+    // 转换为JSON格式：修正JSON语法（添加转义、规范括号）
+    std::string convertToJSON(const DataRecord& data) { 
+        std::string tags_json = "["; 
+        int i = 0; 
+        for (const auto& tag : data.tags) { 
+            if (i++ > 0) tags_json += ","; 
+            tags_json += "\"" + tag + "\"";
+        }
+        tags_json += "]"; 
+        return "{\"id\":\"" + data.id + "\",\"content\":\"" + data.content + "\",\"category\":\"" + data.category + "\",\"tags\":" + tags_json + "}"; 
+    }
+}; 
+
+// 数据预处理类（修正函数参数、字符串处理逻辑）
+class DataPreprocessor { 
+public:
+    // 预处理：去除空格、标签转为小写
+    void preprocess(DataRecord& data) { 
+        trim(data.content);
+        trim(data.category);
+        std::unordered_set<std::string> newTags;
+        for (const auto& tag : data.tags) {  // 修正迭代器类型（const避免修改原标签）
+            std::string lowerTag = toLower(tag); 
+            newTags.insert(lowerTag); 
+        } 
+        data.tags = std::move(newTags); 
+    }
+private: 
+    // 去除字符串前后空格：修正边界判断
+    static void trim(std::string& s) { 
+        const char* whitespace = " \t\n\r"; 
+        s.erase(0, s.find_first_not_of(whitespace)); 
+        if (!s.empty()) {  // 避免空字符串erase越界
+            s.erase(s.find_last_not_of(whitespace) + 1); 
+        }
+    } 
+
+    // 字符串转为小写：修正算法调用（确保全局作用域的tolower）
+    static std::string toLower(const std::string& s) { 
+        std::string ret = s; 
+        std::transform(ret.begin(), ret.end(), ret.begin(), [](unsigned char c) { return std::tolower(c); });
+        return ret; 
+    } 
+}; 
+
+// 核心服务类（修正函数逻辑、作用域、错误抛出）
+class ChemicalMLService { 
+private: 
+    std::unordered_map<std::string, DataRecord> dataStore;  // ID-数据映射
+    std::unordered_map<std::string, std::unordered_set<std::string>> categoryIndex;  // 分类-ID索引
+    std::unordered_map<std::string, std::unordered_set<std::string>> tagIndex;        // 标签-ID索引
+    std::mutex mutex_;                // 线程安全锁
+    DataQualityChecker qualityChecker;// 质量检测实例
+    PermissionManager permissionManager;// 权限管理实例
+    DataPreprocessor preprocessor;    // 数据预处理实例
+    HistoryStorage historyStorage;    // 历史存储实例
+    DataFormatConverter formatConverter;// 格式转换实例
+public:
+    ChemicalMLService() = default;  // 默认构造
+
+    // 上传数据：修正逻辑顺序、错误抛出
+    bool uploadData(const DataRecord& rawData) { 
+        std::lock_guard<std::mutex> lock(mutex_); 
+        // 1. 权限校验
+        if (!permissionManager.canUpload(rawData.uploader)) { 
+            throw std::runtime_error("无上传权限"); 
+        }
+        // 2. 预处理数据
+        DataRecord data = rawData; 
+        preprocessor.preprocess(data); 
+        // 3. 业务校验
+        if (!qualityChecker.checkFormat(data.content, data.format)) { 
+            throw std::runtime_error("数据格式校验失败"); 
+        }
+        if (!qualityChecker.checkTags(data.tags)) { 
+            throw std::runtime_error("标签校验失败");
+        }
+        if (!qualityChecker.checkCategory(data.category)) {
+            throw std::runtime_error("分类校验失败");
+        }
+        // 4. 唯一ID检查
+        if (dataStore.find(data.id) != dataStore.end()) { 
+            throw std::runtime_error("数据ID已存在"); 
+        }
+        // 5. 存储数据与索引
+        dataStore[data.id] = data; 
+        categoryIndex[data.category].insert(data.id); 
+        for (const auto& tag : data.tags) { 
+            tagIndex[tag].insert(data.id); 
+        }
+        return true;
+    } 
+
+    // 删除数据：修正索引删除逻辑、权限判断
+    bool deleteData(const std::string& id, const std::string& username) { 
+        std::lock_guard<std::mutex> lock(mutex_); 
+        auto it = dataStore.find(id);
+        if (it == dataStore.end()) { 
+            throw std::runtime_error("数据不存在"); 
+        }
+        // 权限检查
+        if (!permissionManager.canModify(username, it->second)) { 
+            throw std::runtime_error("无删除权限"); 
+        }
+        // 1. 保存历史记录
+        historyStorage.addHistory(it->second); 
+        // 2. 移除分类索引（空分类需删除键）
+        const std::string& oldCategory = it->second.category;
+        categoryIndex[oldCategory].erase(id);
+        if (categoryIndex[oldCategory].empty()) { 
+            categoryIndex.erase(oldCategory); 
+        }
+        // 3. 移除标签索引（空标签需删除键）
+        for (const auto& tag : it->second.tags) { 
+            auto tagIt = tagIndex.find(tag);
+            if (tagIt != tagIndex.end()) { 
+                tagIt->second.erase(id); 
+                if (tagIt->second.empty()) { 
+                    tagIndex.erase(tagIt); 
+                }
+            }
+        }
+        // 4. 删除数据
+        dataStore.erase(it); 
+        return true;
+    }
+
+    // 更新数据：修正迭代器作用域、索引更新逻辑
+    bool updateData(const DataRecord& newData, const std::string& username) { 
+        std::lock_guard<std::mutex> lock(mutex_); 
+        // 修正：先声明迭代器再判断（避免作用域错误）
+        auto it = dataStore.find(newData.id);
+        if (it == dataStore.end()) { 
+            throw std::runtime_error("数据不存在"); 
+        }
+        // 权限检查
+        if (!permissionManager.canModify(username, it->second)) {
+            throw std::runtime_error("无编辑权限"); 
+        }
+        // 1. 预处理新数据
+        DataRecord dataCopy = newData; 
+        preprocessor.preprocess(dataCopy); 
+        // 2. 校验新数据
+        if (!qualityChecker.checkFormat(dataCopy.content, dataCopy.format)) { 
+            throw std::runtime_error("数据格式校验失败"); 
+        }
+        if (!qualityChecker.checkTags(dataCopy.tags)) { 
+            throw std::runtime_error("标签校验失败");
+        }
+        if (!qualityChecker.checkCategory(dataCopy.category)) { 
+            throw std::runtime_error("分类校验失败");
+        }
+        // 3. 备份旧数据到历史
+        historyStorage.addHistory(it->second); 
+        // 4. 移除旧索引
+        const std::string& oldCategory = it->second.category;
+        categoryIndex[oldCategory].erase(it->second.id);
+        if (categoryIndex[oldCategory].empty()) { 
+            categoryIndex.erase(oldCategory); 
+        }
+        for (const auto& tag : it->second.tags) { 
+            auto tagIt = tagIndex.find(tag);
+            if (tagIt != tagIndex.end()) { 
+                tagIt->second.erase(it->second.id); 
+                if (tagIt->second.empty()) { 
+                    tagIndex.erase(tagIt); 
+                }
+            }
+        }
+        // 5. 插入新索引
+        categoryIndex[dataCopy.category].insert(dataCopy.id); 
+        for (const auto& tag : dataCopy.tags) {
+            tagIndex[tag].insert(dataCopy.id); 
+        } 
+        // 6. 更新数据
+        it->second = std::move(dataCopy);
+        return true;
+    }
+
+    // 查询单条数据：修正权限判断、返回逻辑
+    DataRecord getData(const std::string& id, const std::string& username) { 
+        std::lock_guard<std::mutex> lock(mutex_); 
+        auto it = dataStore.find(id); 
+        if (it == dataStore.end()) { 
+            throw std::runtime_error("数据不存在"); 
+        }
+        if (!permissionManager.canAccess(username, it->second.category)) { 
+            throw std::runtime_error("无访问权限"); 
+        }
+        return it->second; 
+    }
+
+    // 按分类查询数据ID：修正索引查询逻辑
+    std::vector<std::string> listDataByCategory(const std::string& category, const std::string& username) {
+        std::lock_guard<std::mutex> lock(mutex_); 
+        if (!permissionManager.canAccess(username, category)) { 
+            throw std::runtime_error("无访问权限"); 
+        }
+        std::vector<std::string> results; 
+        auto it = categoryIndex.find(category);
+        if (it != categoryIndex.end()) { 
+            for (const auto& id : it->second) { 
+                results.push_back(id); 
+            }
+        }
+        return results;
+    }
+
+    // 按标签查询数据ID：修正权限筛选逻辑
+    std::vector<std::string> listDataByTag(const std::string& tag, const std::string& username) { 
+        std::lock_guard<std::mutex> lock(mutex_); 
+        std::vector<std::string> results; 
+        auto tagIt = tagIndex.find(tag);
+        if (tagIt != tagIndex.end()) { 
+            for (const auto& id : tagIt->second) { 
+                auto dataIt = dataStore.find(id); 
+                if (dataIt != dataStore.end() && permissionManager.canAccess(username, dataIt->second.category)) { 
+                    results.push_back(id); 
+                }
+            }
+        }
+        return results;
+    }
+
+    // 查询历史版本：修正权限校验逻辑
+    std::vector<DataRecord> getHistory(const std::string& id, const std::string& username) { 
+        std::lock_guard<std::mutex> lock(mutex_); 
+        // 权限校验：基于当前数据分类
+        auto it = dataStore.find(id);
+        if (it == dataStore.end()) { 
+            throw std::runtime_error("数据不存在"); 
+        }
+        if (!permissionManager.canAccess(username, it->second.category)) { 
+            throw std::runtime_error("无访问权限"); 
+        }
+        return historyStorage.queryHistory(id); 
+    }
+
+    // 格式转换：修正目标格式判断逻辑
+    std::string convertDataFormat(const std::string& id, const std::string& targetFormat, const std::string& username) { 
+        std::lock_guard<std::mutex> lock(mutex_); 
+        auto it = dataStore.find(id);
+        if (it == dataStore.end()) { 
+            throw std::runtime_error("数据不存在"); 
+        }
+        if (!permissionManager.canAccess(username, it->second.category)) { 
+            throw std::runtime_error("无访问权限"); 
+        }
+        if (targetFormat == "CSV") { 
+            return formatConverter.convertToCSV(it->second); 
+        } else if (targetFormat == "JSON") { 
+            return formatConverter.convertToJSON(it->second); 
+        } else { 
+            throw std::runtime_error("暂不支持的格式转换"); 
+        }
+    }
+
+    // 添加标签：修正标签校验、索引更新
+    bool addTag(const std::string& id, const std::string& tag, const std::string& username) { 
+        std::lock_guard<std::mutex> lock(mutex_); 
+        auto it = dataStore.find(id);
+        if (it == dataStore.end()) { 
+            throw std::runtime_error("数据不存在"); 
+        }
+        if (!permissionManager.canModify(username, it->second)) { 
+            throw std::runtime_error("无权限修改标签"); 
+        }
+        // 标签格式校验
+        if (!qualityChecker.checkTags({tag})) { 
+            throw std::runtime_error("标签格式非法");
+        }
+        // 已存在则不重复添加
+        if (it->second.tags.count(tag) == 0) { 
+            it->second.tags.insert(tag); 
+            tagIndex[tag].insert(id); 
+        }
+        return true;
+    }
+
+    // 删除标签：修正标签存在性判断、索引清理
+    bool removeTag(const std::string& id, const std::string& tag, const std::string& username) { 
+        std::lock_guard<std::mutex> lock(mutex_); 
+        auto it = dataStore.find(id); 
+        if (it == dataStore.end()) { 
+            throw std::runtime_error("数据不存在"); 
+        }
+        if (!permissionManager.canModify(username, it->second)) { 
+            throw std::runtime_error("无权限修改标签"); 
+        }
+        if (it->second.tags.count(tag) != 0) { 
+            it->second.tags.erase(tag); 
+            auto tagIt = tagIndex.find(tag);
+            if (tagIt != tagIndex.end()) { 
+                tagIt->second.erase(id); 
+                if (tagIt->second.empty()) { 
+                    tagIndex.erase(tagIt); 
+                }
+            }
+        }
+        return true;
+    }
+
+    // 更新分类：修正分类校验、索引更新
+    bool updateCategory(const std::string& id, const std::string& newCategory, const std::string& username) { 
+        std::lock_guard<std::mutex> lock(mutex_); 
+        auto it = dataStore.find(id); 
+        if (it == dataStore.end()) { 
+            throw std::runtime_error("数据不存在"); 
+        }
+        if (!permissionManager.canModify(username, it->second)) { 
+            throw std::runtime_error("无权限修改分类"); 
+        }
+        if (!qualityChecker.checkCategory(newCategory)) { 
+            throw std::runtime_error("分类校验失败");
+        }
+        // 移除旧索引
+        const std::string& oldCategory = it->second.category;
+        categoryIndex[oldCategory].erase(id);
+        if (categoryIndex[oldCategory].empty()) { 
+            categoryIndex.erase(oldCategory); 
+        }
+        // 添加新索引
+        categoryIndex[newCategory].insert(id); 
+        it->second.category = newCategory; 
+        return true;
+    }
+
+    // 设置用户角色：修正管理员权限校验
+    bool setUserRole(const std::string& adminUser, const std::string& username, PermissionManager::Role role) { 
+        if (permissionManager.getUserRole(adminUser) != PermissionManager::Role::ADMIN) { 
+            throw std::runtime_error("非管理员无权限设置用户角色"); 
+        }
+        permissionManager.setUserRole(username, role); 
+        return true;
+    }
+};

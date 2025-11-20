@@ -1,0 +1,215 @@
+#include <iostream>
+#include <string>
+#include <vector> 
+#include <unordered_map>
+#include <unordered_set> 
+#include <mutex>
+#include <shared_mutex> 
+#include <regex>
+#include <memory>
+#include <utility>  // 用于std::pair
+
+// 数据结构体（修正重复定义、命名空间笔误）
+struct ChemicalData { 
+    std::string id;                // 数据唯一标识（删除重复定义）
+    std::string rawData;           // 原始数据（删除重复定义，修正std::string）
+    std::string format;            // 数据格式（删除重复定义，修正std::string）
+    std::unordered_set<std::string> tags;  // 标签集合
+    bool qualityCheckPassed;       // 质量检测结果
+    std::string category;          // 数据分类（删除重复定义，修正std::string）
+
+    ChemicalData() : qualityCheckPassed(false) {}  // 构造初始化
+}; 
+
+// 错误码枚举（修正枚举值顺序，确保语义正确）
+enum class ErrorCode { 
+    SUCCESS = 0,
+    INVALID_DATA_FORMAT,  // 无效数据格式
+    NOT_FOUND,            // 数据未找到
+    PERMISSION_DENIED,    // 权限拒绝
+    UPLOAD_FAILED,        // 上传失败
+    INVALID_PARAMETER,    // 无效参数
+    QUALITY_CHECK_FAILED, // 质量检测失败
+    DUPLICATE_DATA,       // 数据重复
+    UNKNOWN_ERROR         // 未知错误
+}; 
+
+// 权限级别枚举（修正枚举值语义）
+enum class AccessLevel { 
+    NONE = 0,     // 无权限
+    READ = 1,     // 只读权限
+    WRITE = 2,    // 读写权限
+    ADMIN = 3     // 管理员权限
+}; 
+
+// 用户权限管理（修正线程安全、函数逻辑）
+class PermissionManager { 
+private: 
+    std::unordered_map<std::string, AccessLevel> userPermissions;  // 用户-权限映射
+    std::shared_mutex permMutex;  // 读写锁（支持多读单写）
+public:
+    PermissionManager() { 
+        // 初始化管理员权限
+        userPermissions["admin"] = AccessLevel::ADMIN; 
+    } 
+
+    // 设置用户权限：修正锁类型（写操作需unique_lock）
+    void setPermission(const std::string& userId, AccessLevel level) { 
+        std::unique_lock<std::shared_mutex> lock(permMutex); 
+        userPermissions[userId] = level; 
+    }
+
+    // 获取用户权限：修正锁类型（读操作需shared_lock）
+    AccessLevel getPermission(const std::string& userId) { 
+        std::shared_lock<std::shared_mutex> lock(permMutex); 
+        auto it = userPermissions.find(userId); 
+        return (it != userPermissions.end()) ? it->second : AccessLevel::NONE; 
+    }
+
+    // 写权限判断：WRITE/ADMIN可写
+    bool hasWritePermission(const std::string& userId) { 
+        AccessLevel level = getPermission(userId); 
+        return (level == AccessLevel::WRITE || level == AccessLevel::ADMIN); 
+    }
+
+    // 读权限判断：READ/WRITE/ADMIN可读
+    bool hasReadPermission(const std::string& userId) { 
+        AccessLevel level = getPermission(userId); 
+        return (level == AccessLevel::READ || level == AccessLevel::WRITE || level == AccessLevel::ADMIN);
+    }
+
+    // 管理员权限判断：仅ADMIN
+    bool hasAdminPermission(const std::string& userId) { 
+        return (getPermission(userId) == AccessLevel::ADMIN);
+    }
+}; 
+
+// 数据格式转换工具（修正转换逻辑，确保格式正确）
+class DataFormatConverter { 
+public:
+    // 格式转换：支持csv/json/sdf/mol/txt互转（修正转换标识）
+    static std::string convert(const std::string& sourceData, const std::string& sourceFormat, const std::string& targetFormat) { 
+        if (sourceFormat == targetFormat) return sourceData;  // 相同格式直接返回
+        // 转换标识（实际项目需实现完整转换逻辑，此处保留原有语义）
+        return "[converted:" + sourceFormat + "→" + targetFormat + "]" + sourceData; 
+    }
+};
+
+// 数据质量检测工具（修正检测逻辑、正则表达式）
+class DataQualityChecker { 
+public:
+    // 质量检测：非空、格式有效、长度足够、字符合法
+    static bool checkQuality(const ChemicalData& data) { 
+        if (data.rawData.empty()) return false;  // 非空检查
+        if (!isValidFormat(data.format)) return false;  // 格式有效
+        if (data.rawData.length() < 10) return false;  // 长度足够（至少10字符）
+        // 字符合法：仅允许字母、数字、空格、横线、逗号、点、分号、冒号
+        std::regex r("[\\w\\s\\-\\,\\.\\;\\:]+"); 
+        return std::regex_match(data.rawData, r); 
+    }
+private: 
+    // 有效格式判断：支持csv/json/sdf/mol/txt
+    static bool isValidFormat(const std::string& format) { 
+        static const std::unordered_set<std::string> validFormats = { "csv", "json", "sdf", "mol", "txt" }; 
+        return validFormats.count(format) > 0; 
+    } 
+}; 
+
+// 数据标签管理（修正函数参数、逻辑）
+class DataTagManager { 
+public: 
+    // 添加标签：确保标签非空
+    void addTag(ChemicalData& data, const std::string& tag) { 
+        if (!tag.empty()) { 
+            data.tags.insert(tag); 
+        }
+    }
+
+    // 删除标签：存在则删除
+    void removeTag(ChemicalData& data, const std::string& tag) { 
+        data.tags.erase(tag); 
+    }
+
+    // 检查标签是否存在
+    bool hasTag(const ChemicalData& data, const std::string& tag) { 
+        return (data.tags.find(tag) != data.tags.end()); 
+    }
+}; 
+
+// 数据分类管理（修正构造函数、分类集合）
+class DataCategoryManager { 
+private:
+    std::unordered_set<std::string> validCategories;  // 有效分类集合
+public: 
+    DataCategoryManager() { 
+        // 初始化有效分类（有机/无机/高分子/催化剂/纳米材料/药物化学）
+        validCategories = { "有机", "无机", "高分子", "催化剂", "纳米材料", "药物化学" }; 
+    }
+
+    // 分类有效性判断
+    bool isValidCategory(const std::string& category) { 
+        return validCategories.count(category) > 0; 
+    }
+
+    // 获取所有有效分类
+    std::unordered_set<std::string> getCategories() { 
+        return validCategories; 
+    }
+}; 
+
+// 数据仓库（线程安全，修正CRUD逻辑）
+class ChemicalDataRepository { 
+private:
+    std::unordered_map<std::string, ChemicalData> dataMap;  // ID-数据映射
+    mutable std::shared_mutex dataMutex;  // 读写锁
+public:
+    // 检查数据是否存在
+    bool exists(const std::string& id) const { 
+        std::shared_lock<std::shared_mutex> lock(dataMutex); 
+        return (dataMap.find(id) != dataMap.end()); 
+    }
+
+    // 添加数据：不存在则添加
+    bool addData(const ChemicalData& data) { 
+        std::unique_lock<std::shared_mutex> lock(dataMutex); 
+        if (dataMap.find(data.id) != dataMap.end()) return false; 
+        dataMap[data.id] = data; 
+        return true;
+    }
+
+    // 更新数据：存在则更新
+    bool updateData(const ChemicalData& data) { 
+        std::unique_lock<std::shared_mutex> lock(dataMutex); 
+        auto it = dataMap.find(data.id); 
+        if (it == dataMap.end()) return false; 
+        it->second = data; 
+        return true;
+    }
+
+    // 删除数据：存在则删除
+    bool removeData(const std::string& id) { 
+        std::unique_lock<std::shared_mutex> lock(dataMutex); 
+        return (dataMap.erase(id) > 0); 
+    }
+
+    // 获取数据：存在则返回，否则返回空对象
+    ChemicalData getData(const std::string& id) const { 
+        std::shared_lock<std::shared_mutex> lock(dataMutex); 
+        auto it = dataMap.find(id); 
+        return (it != dataMap.end()) ? it->second : ChemicalData{}; 
+    }
+
+    // 按分类查询数据
+    std::vector<ChemicalData> listDataByCategory(const std::string& category) const { 
+        std::shared_lock<std::shared_mutex> lock(dataMutex); 
+        std::vector<ChemicalData> result; 
+        for (const auto& [id, data] : dataMap) { 
+            if (data.category == category) { 
+                result.push_back(data); 
+            }
+        }
+        return result; 
+    }
+}; 
+
+//

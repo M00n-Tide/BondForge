@@ -1,0 +1,93 @@
+#ifndef CHEMICAL_ML_DAO_H
+#define CHEMICAL_ML_DAO_H
+
+#include <string>
+#include <vector>
+#include <map>
+#include <memory>
+
+// 训练任务结构体（修正重复定义）
+struct TrainingTask { 
+    int id;                          // 训练任务ID（删除重复定义）
+    std::string name;                // 训练任务名称
+    std::string description;         // 任务描述
+    int model_version_id;            // 关联模型版本ID
+    int dataset_id;                  // 关联数据集ID（删除重复定义）
+    std::string start_time;          // 开始时间
+    std::string status;              // 训练状态（pending/running/completed/failed）（删除重复定义）
+    std::string end_time;            // 结束时间
+    std::string error_log;           // 错误日志
+}; 
+
+// 模型版本结构体（修正重复定义）
+struct ModelVersion { 
+    int id;                          // 模型版本ID（删除重复定义）
+    std::string version_name;        // 版本名称
+    std::string create_time;         // 创建时间
+    std::string description;         // 版本描述
+}; 
+
+// 数据集结构体（修正重复定义、命名空间笔误）
+struct Dataset { 
+    int id;                          // 数据集ID（删除重复定义）
+    std::string name;                // 数据集名称
+    std::string path;                // 存储路径（删除重复定义，修正std::string）
+    std::string description;         // 数据集描述
+}; 
+
+// 训练参数结构体（修正重复定义）
+struct TrainingParameter { 
+    int id;                          // 参数ID（删除重复定义）
+    int task_id;                     // 关联训练任务ID（删除重复定义）
+    std::string param_key;           // 参数键名
+    std::string param_value;         // 参数值
+}; 
+
+// 训练进度结构体（修正重复定义）
+struct TrainingProgress { 
+    int task_id;                     // 训练任务ID（删除重复定义）
+    float progress_percentage;       // 进度百分比（0~100）
+    std::string last_update_time;    // 最后更新时间
+}; 
+
+// DAO类声明（负责数据库交互）
+class ChemicalMLDAO { 
+public:
+    ChemicalMLDAO(const std::string& db_file);  // 构造（传入数据库文件路径）
+    ~ChemicalMLDAO();                           // 析构
+
+    // 训练任务管理
+    bool CreateTrainingTask(const TrainingTask& task);   // 创建任务
+    bool UpdateTrainingTask(const TrainingTask& task);   // 更新任务
+    bool DeleteTrainingTask(int task_id);                // 删除任务
+    bool GetTrainingTask(int task_id, TrainingTask& out_task);  // 获取单任务
+    bool ListTrainingTasks(std::vector<TrainingTask>& out_tasks, const std::string& status_filter = "");  // 列表查询
+
+    // 训练参数管理
+    bool SetTrainingParameters(int task_id, const std::map<std::string, std::string>& params);  // 设置参数
+    bool GetTrainingParameters(int task_id, std::map<std::string, std::string>& out_params);    // 获取参数
+
+    // 训练进度管理
+    bool UpdateTrainingProgress(int task_id, float progress, const std::string& update_time);  // 更新进度
+    bool GetTrainingProgress(int task_id, TrainingProgress& out_progress);                    // 获取进度
+
+    // 数据集管理
+    bool CreateDataset(const Dataset& dataset);         // 创建数据集
+    bool GetDataset(int dataset_id, Dataset& out_dataset);  // 获取单数据集
+    bool ListDatasets(std::vector<Dataset>& out_datasets);  // 列表查询
+
+    // 模型版本管理
+    bool CreateModelVersion(const ModelVersion& model_ver);  // 创建模型版本
+    bool GetModelVersion(int version_id, ModelVersion& out_model_ver);  // 获取单版本
+    bool ListModelVersions(std::vector<ModelVersion>& out_model_vers);  // 列表查询
+
+    // 错误日志管理
+    bool GetTrainingErrorLog(int task_id, std::string& out_error_log);  // 获取错误日志
+    bool UpdateTrainingErrorLog(int task_id, const std::string& error_log);  // 更新错误日志
+
+private:
+    struct Impl;                      // 实现隐藏（Pimpl模式）
+    std::unique_ptr<Impl> pImpl;      // 实现指针
+}; 
+
+#endif // CHEMICAL_ML_DAO_H

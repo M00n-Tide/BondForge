@@ -1,0 +1,677 @@
+#include "chemical_ml_dao.h" 
+#include <sqlite3.h>
+#include <iostream>
+#include <string>
+
+// 实现结构体（Pimpl模式）
+struct ChemicalMLDAO::Impl { 
+    sqlite3* db;  // SQLite数据库句柄
+
+    // 构造：打开数据库并初始化表
+    Impl(const std::string& db_file) : db(nullptr) { 
+        int rc = sqlite3_open(db_file.c_str(), &db); 
+        if (rc != SQLITE_OK) {  // 修正错误判断（SQLITE_OK为成功）
+            std::cerr << "无法打开数据库: " << sqlite3_errmsg(db) << std::endl; 
+            sqlite3_close(db);  // 打开失败需关闭句柄
+            db = nullptr; 
+        } else { 
+            InitDatabase();  // 初始化表结构
+        }
+    } 
+
+    // 析构：关闭数据库
+    ~Impl() { 
+        if (db != nullptr) { 
+            sqlite3_close(db); 
+            db = nullptr; 
+        }
+    }
+
+    // 初始化数据库表结构：修正SQL语法、删除多余符号
+    void InitDatabase() { 
+        if (db == nullptr) return; 
+
+        // 1. 训练任务表（修正SQL语法：逗号、括号、多余":"）
+        const char* create_training_task = R"(
+            CREATE TABLE IF NOT EXISTS training_tasks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                description TEXT,
+                model_version_id INTEGER,
+                status TEXT NOT NULL,
+                dataset_id INTEGER,
+                start_time TEXT,
+                end_time TEXT,
+                error_log TEXT
+            )
+        )";
+
+        // 2. 模型版本表（修正多余":"）
+        const char* create_model_version = R"(
+            CREATE TABLE IF NOT EXISTS model_versions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                version_name TEXT NOT NULL,
+                create_time TEXT,
+                description TEXT
+            )
+        )";
+
+        // 3. 数据集表（修正"."为","、多余":"）
+        const char* create_dataset = R"(
+            CREATE TABLE IF NOT EXISTS datasets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                path TEXT NOT NULL,
+                description TEXT
+            )
+        )";
+
+        // 4. 训练参数表（修正外键语法、多余":"）
+        const char* create_training_params = R"(
+            CREATE TABLE IF NOT EXISTS training_parameters (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                task_id INTEGER NOT NULL,
+                param_key TEXT NOT NULL,
+                param_value TEXT,
+                FOREIGN KEY(task_id) REFERENCES training_tasks(id) ON DELETE CASCADE
+            )
+        )";
+
+        // 5. 训练进度表（修正多余":"）
+        const char* create_training_progress = R"(
+            CREATE TABLE IF NOT EXISTS training_progress (
+                task_id INTEGER PRIMARY KEY,
+                progress_percentage REAL NOT NULL,
+                last_update_time TEXT,
+                FOREIGN KEY(task_id) REFERENCES training_tasks(id) ON DELETE CASCADE
+            )
+        )";
+
+        // 启用外键约束（修正空格错误：foreign_ keys → foreign_keys）
+        sqlite3_exec(db, "PRAGMA foreign_keys = ON;", nullptr, nullptr, nullptr); 
+        char* errMsg = nullptr;
+
+        // 创建训练任务表（修正slite3_exec → sqlite3_exec、std:cerr → std::cerr）
+        if (sqlite3_exec(db, create_training_task, nullptr, nullptr, &errMsg) != SQLITE_OK) { 
+            std::cerr << "创建training_tasks表失败: " << errMsg << std::endl; 
+            sqlite3_free(errMsg); 
+            errMsg = nullptr;
+        }
+
+        // 创建模型版本表（修正SQLITE_O → SQLITE_OK）
+        if (sqlite3_exec(db, create_model_version, nullptr, nullptr, &errMsg) != SQLITE_OK) { 
+            std::cerr << "创建model_versions表失败: " << errMsg << std::endl; 
+            sqlite3_free(errMsg); 
+            errMsg = nullptr;
+        }
+
+        // 创建数据集表
+        if (sqlite3_exec(db, create_dataset, nullptr, nullptr, &errMsg) != SQLITE_OK) { 
+            std::cerr << "创建datasets表失败: " << errMsg << std::endl; 
+            sqlite3_free(errMsg); 
+            errMsg = nullptr;
+        }
+
+        // 创建训练参数表（修正create _training_params → create_training_params）
+        if (sqlite3_exec(db, create_training_params, nullptr, nullptr, &errMsg) != SQLITE_OK) { 
+            std::cerr << "创建training_parameters表失败: " << errMsg << std::endl; 
+            sqlite3_free(errMsg); 
+            errMsg = nullptr;
+        }
+
+        // 创建训练进度表（修正slite3_exec → sqlite3_exec、nulptr → nullptr）
+        if (sqlite3_exec(db, create_training_progress, nullptr, nullptr, &errMsg) != SQLITE_OK) { 
+            std::cerr << "创建training_progress表失败: " << errMsg << std::endl; 
+            sqlite3_free(errMsg); 
+            errMsg = nullptr;
+        }
+    }
+
+    // 准备SQL语句：修正错误处理、返回值
+    sqlite3_stmt* PrepareStatement(const std::string& sql) { 
+        sqlite3_stmt* stmt = nullptr; 
+        int rc = sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr); 
+        if (rc != SQLITE_OK) { 
+            std::cerr << "SQL错误: " << sqlite3_errmsg(db) << " | SQL: " << sql << std::endl; 
+            if (stmt != nullptr) { 
+                sqlite3_finalize(stmt);  // 准备失败需释放语句
+            }
+            return nullptr; 
+        }
+        return stmt; 
+    } 
+}; 
+
+// DAO构造：初始化实现
+ChemicalMLDAO::ChemicalMLDAO(const std::string& db_file) : pImpl(new Impl(db_file)) {} 
+// DAO析构：默认（unique_ptr自动释放）
+ChemicalMLDAO::~ChemicalMLDAO() = default; 
+
+// 创建训练任务：修正SQL拼接、参数绑定
+bool ChemicalMLDAO::CreateTrainingTask(const TrainingTask& task) { 
+    if (pImpl->db == nullptr) return false; 
+
+    // 修正SQL拼接（换行与占位符）
+    const std::string sql = R"(
+        INSERT INTO training_tasks (name, description, model_version_id, dataset_id, status, start_time, end_time, error_log)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+    )";
+
+    sqlite3_stmt* stmt = pImpl->PrepareStatement(sql); 
+    if (stmt == nullptr) return false; 
+
+    // 绑定参数（修正空值判断、参数索引）
+    sqlite3_bind_text(stmt, 1, task.name.c_str(), -1, SQLITE_TRANSIENT); 
+    sqlite3_bind_text(stmt, 2, task.description.c_str(), -1, SQLITE_TRANSIENT);
+    
+    if (task.model_version_id > 0) {
+        sqlite3_bind_int(stmt, 3, task.model_version_id); 
+    } else { 
+        sqlite3_bind_null(stmt, 3); 
+    }
+
+    if (task.dataset_id > 0) {
+        sqlite3_bind_int(stmt, 4, task.dataset_id); 
+    } else { 
+        sqlite3_bind_null(stmt, 4); 
+    }
+
+    sqlite3_bind_text(stmt, 5, task.status.c_str(), -1, SQLITE_TRANSIENT); 
+    
+    if (!task.start_time.empty()) {
+        sqlite3_bind_text(stmt, 6, task.start_time.c_str(), -1, SQLITE_TRANSIENT); 
+    } else { 
+        sqlite3_bind_null(stmt, 6); 
+    }
+
+    if (!task.end_time.empty()) {
+        sqlite3_bind_text(stmt, 7, task.end_time.c_str(), -1, SQLITE_TRANSIENT); 
+    } else { 
+        sqlite3_bind_null(stmt, 7); 
+    }
+
+    if (!task.error_log.empty()) {
+        sqlite3_bind_text(stmt, 8, task.error_log.c_str(), -1, SQLITE_TRANSIENT); 
+    } else { 
+        sqlite3_bind_null(stmt, 8); 
+    }
+
+    int rc = sqlite3_step(stmt); 
+    sqlite3_finalize(stmt);  // 必须释放语句
+    return (rc == SQLITE_DONE); 
+}
+
+// 更新训练任务：修正SQL语法、参数绑定
+bool ChemicalMLDAO::UpdateTrainingTask(const TrainingTask& task) { 
+    if (pImpl->db == nullptr) return false; 
+
+    // 修正SQL语法（SET子句顺序、WHERE条件）
+    const std::string sql = R"(
+        UPDATE training_tasks
+        SET name = ?, description = ?, model_version_id = ?, dataset_id = ?, status = ?, start_time = ?, end_time = ?, error_log = ?
+        WHERE id = ?;
+    )";
+
+    sqlite3_stmt* stmt = pImpl->PrepareStatement(sql); 
+    if (stmt == nullptr) return false; 
+
+    // 绑定参数（修正索引顺序）
+    sqlite3_bind_text(stmt, 1, task.name.c_str(), -1, SQLITE_TRANSIENT); 
+    sqlite3_bind_text(stmt, 2, task.description.c_str(), -1, SQLITE_TRANSIENT);
+    
+    if (task.model_version_id > 0) {
+        sqlite3_bind_int(stmt, 3, task.model_version_id); 
+    } else { 
+        sqlite3_bind_null(stmt, 3); 
+    }
+
+    if (task.dataset_id > 0) {
+        sqlite3_bind_int(stmt, 4, task.dataset_id); 
+    } else { 
+        sqlite3_bind_null(stmt, 4); 
+    }
+
+    sqlite3_bind_text(stmt, 5, task.status.c_str(), -1, SQLITE_TRANSIENT); 
+    
+    if (!task.start_time.empty()) {
+        sqlite3_bind_text(stmt, 6, task.start_time.c_str(), -1, SQLITE_TRANSIENT); 
+    } else { 
+        sqlite3_bind_null(stmt, 6); 
+    }
+
+    if (!task.end_time.empty()) {
+        sqlite3_bind_text(stmt, 7, task.end_time.c_str(), -1, SQLITE_TRANSIENT); 
+    } else { 
+        sqlite3_bind_null(stmt, 7); 
+    }
+
+    if (!task.error_log.empty()) {
+        sqlite3_bind_text(stmt, 8, task.error_log.c_str(), -1, SQLITE_TRANSIENT); 
+    } else { 
+        sqlite3_bind_null(stmt, 8); 
+    }
+
+    sqlite3_bind_int(stmt, 9, task.id);  // 任务ID（WHERE条件）
+
+    int rc = sqlite3_step(stmt); 
+    sqlite3_finalize(stmt); 
+    return (rc == SQLITE_DONE); 
+}
+
+// 删除训练任务：修正参数绑定顺序
+bool ChemicalMLDAO::DeleteTrainingTask(int task_id) { 
+    if (pImpl->db == nullptr) return false; 
+
+    const std::string sql = "DELETE FROM training_tasks WHERE id = ?;";
+    sqlite3_stmt* stmt = pImpl->PrepareStatement(sql); 
+    if (stmt == nullptr) return false; 
+
+    // 修正：先绑定参数再执行step
+    sqlite3_bind_int(stmt, 1, task_id); 
+    int rc = sqlite3_step(stmt); 
+    sqlite3_finalize(stmt); 
+    return (rc == SQLITE_DONE); 
+}
+
+// 获取单训练任务：修正字段读取、空值处理
+bool ChemicalMLDAO::GetTrainingTask(int task_id, TrainingTask& out_task) { 
+    if (pImpl->db == nullptr) return false; 
+
+    const std::string sql = R"(
+        SELECT id, name, description, model_version_id, dataset_id, status, start_time, end_time, error_log
+        FROM training_tasks WHERE id = ? LIMIT 1;
+    )";
+
+    sqlite3_stmt* stmt = pImpl->PrepareStatement(sql); 
+    if (stmt == nullptr) return false; 
+
+    sqlite3_bind_int(stmt, 1, task_id); 
+    int rc = sqlite3_step(stmt); 
+
+    if (rc == SQLITE_ROW) { 
+        // 修正字段索引、空值判断（sqlite3_column_type）
+        out_task.id = sqlite3_column_int(stmt, 0); 
+        out_task.name = (sqlite3_column_text(stmt, 1) != nullptr) ? reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1)) : ""; 
+        out_task.description = (sqlite3_column_text(stmt, 2) != nullptr) ? reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2)) : ""; 
+        out_task.model_version_id = (sqlite3_column_type(stmt, 3) != SQLITE_NULL) ? sqlite3_column_int(stmt, 3) : 0; 
+        out_task.dataset_id = (sqlite3_column_type(stmt, 4) != SQLITE_NULL) ? sqlite3_column_int(stmt, 4) : 0; 
+        out_task.status = (sqlite3_column_text(stmt, 5) != nullptr) ? reinterpret_cast<const char*>(sqlite3_column_text(stmt, 5)) : ""; 
+        out_task.start_time = (sqlite3_column_type(stmt, 6) != SQLITE_NULL) ? reinterpret_cast<const char*>(sqlite3_column_text(stmt, 6)) : ""; 
+        out_task.end_time = (sqlite3_column_type(stmt, 7) != SQLITE_NULL) ? reinterpret_cast<const char*>(sqlite3_column_text(stmt, 7)) : ""; 
+        out_task.error_log = (sqlite3_column_type(stmt, 8) != SQLITE_NULL) ? reinterpret_cast<const char*>(sqlite3_column_text(stmt, 8)) : ""; 
+
+        sqlite3_finalize(stmt); 
+        return true;
+    } 
+
+    sqlite3_finalize(stmt); 
+    return false; 
+}
+
+// 列表查询训练任务：修正SQL拼接、字段读取
+bool ChemicalMLDAO::ListTrainingTasks(std::vector<TrainingTask>& out_tasks, const std::string& status_filter) { 
+    if (pImpl->db == nullptr) return false; 
+
+    // 修正SQL拼接（状态筛选条件）
+    std::string sql = R"(
+        SELECT id, name, description, model_version_id, dataset_id, status, start_time, end_time, error_log
+        FROM training_tasks
+    )";
+    if (!status_filter.empty()) { 
+        sql += " WHERE status = ?"; 
+    }
+    sql += " ORDER BY id DESC;"; 
+
+    sqlite3_stmt* stmt = pImpl->PrepareStatement(sql); 
+    if (stmt == nullptr) return false; 
+
+    // 绑定状态筛选参数
+    if (!status_filter.empty()) { 
+        sqlite3_bind_text(stmt, 1, status_filter.c_str(), -1, SQLITE_TRANSIENT); 
+    }
+
+    out_tasks.clear(); 
+    while (sqlite3_step(stmt) == SQLITE_ROW) { 
+        TrainingTask task; 
+        // 修正字段读取逻辑（与GetTrainingTask一致）
+        task.id = sqlite3_column_int(stmt, 0); 
+        task.name = (sqlite3_column_text(stmt, 1) != nullptr) ? reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1)) : ""; 
+        task.description = (sqlite3_column_text(stmt, 2) != nullptr) ? reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2)) : ""; 
+        task.model_version_id = (sqlite3_column_type(stmt, 3) != SQLITE_NULL) ? sqlite3_column_int(stmt, 3) : 0; 
+        task.dataset_id = (sqlite3_column_type(stmt, 4) != SQLITE_NULL) ? sqlite3_column_int(stmt, 4) : 0; 
+        task.status = (sqlite3_column_text(stmt, 5) != nullptr) ? reinterpret_cast<const char*>(sqlite3_column_text(stmt, 5)) : ""; 
+        task.start_time = (sqlite3_column_type(stmt, 6) != SQLITE_NULL) ? reinterpret_cast<const char*>(sqlite3_column_text(stmt, 6)) : ""; 
+        task.end_time = (sqlite3_column_type(stmt, 7) != SQLITE_NULL) ? reinterpret_cast<const char*>(sqlite3_column_text(stmt, 7)) : ""; 
+        task.error_log = (sqlite3_column_type(stmt, 8) != SQLITE_NULL) ? reinterpret_cast<const char*>(sqlite3_column_text(stmt, 8)) : ""; 
+
+        out_tasks.emplace_back(std::move(task)); 
+    }
+
+    sqlite3_finalize(stmt); 
+    return true; 
+}
+
+// 设置训练参数：修正事务处理、参数绑定
+bool ChemicalMLDAO::SetTrainingParameters(int task_id, const std::map<std::string, std::string>& params) { 
+    if (pImpl->db == nullptr) return false; 
+
+    char* errMsg = nullptr; 
+    // 开始事务（确保原子性）
+    if (sqlite3_exec(pImpl->db, "BEGIN TRANSACTION;", nullptr, nullptr, &errMsg) != SQLITE_OK) { 
+        std::cerr << "开始事务失败: " << errMsg << std::endl; 
+        sqlite3_free(errMsg); 
+        return false; 
+    }
+
+    // 1. 删除旧参数
+    const std::string delete_sql = "DELETE FROM training_parameters WHERE task_id = ?;"; 
+    sqlite3_stmt* delete_stmt = pImpl->PrepareStatement(delete_sql); 
+    if (delete_stmt == nullptr) { 
+        sqlite3_exec(pImpl->db, "ROLLBACK;", nullptr, nullptr, nullptr); 
+        return false; 
+    }
+    sqlite3_bind_int(delete_stmt, 1, task_id); 
+    if (sqlite3_step(delete_stmt) != SQLITE_DONE) { 
+        std::cerr << "删除旧训练参数失败" << std::endl; 
+        sqlite3_finalize(delete_stmt); 
+        sqlite3_exec(pImpl->db, "ROLLBACK;", nullptr, nullptr, nullptr); 
+        return false; 
+    }
+    sqlite3_finalize(delete_stmt); 
+
+    // 2. 插入新参数
+    const std::string insert_sql = R"(
+        INSERT INTO training_parameters (task_id, param_key, param_value)
+        VALUES (?, ?, ?);
+    )";
+    sqlite3_stmt* insert_stmt = pImpl->PrepareStatement(insert_sql); 
+    if (insert_stmt == nullptr) { 
+        sqlite3_exec(pImpl->db, "ROLLBACK;", nullptr, nullptr, nullptr); 
+        return false; 
+    }
+
+    for (const auto& kv : params) { 
+        sqlite3_bind_int(insert_stmt, 1, task_id); 
+        sqlite3_bind_text(insert_stmt, 2, kv.first.c_str(), -1, SQLITE_TRANSIENT); 
+        sqlite3_bind_text(insert_stmt, 3, kv.second.c_str(), -1, SQLITE_TRANSIENT); 
+
+        if (sqlite3_step(insert_stmt) != SQLITE_DONE) { 
+            std::cerr << "插入训练参数失败, key: " << kv.first << std::endl; 
+            sqlite3_finalize(insert_stmt); 
+            sqlite3_exec(pImpl->db, "ROLLBACK;", nullptr, nullptr, nullptr); 
+            return false; 
+        }
+        sqlite3_reset(insert_stmt);  // 重置语句用于下一次插入
+    }
+
+    sqlite3_finalize(insert_stmt); 
+
+    // 提交事务
+    if (sqlite3_exec(pImpl->db, "COMMIT;", nullptr, nullptr, &errMsg) != SQLITE_OK) { 
+        std::cerr << "提交事务失败: " << errMsg << std::endl; 
+        sqlite3_free(errMsg); 
+        sqlite3_exec(pImpl->db, "ROLLBACK;", nullptr, nullptr, nullptr); 
+        return false; 
+    }
+
+    return true; 
+}
+
+// 获取训练参数：修正字段读取、空值处理
+bool ChemicalMLDAO::GetTrainingParameters(int task_id, std::map<std::string, std::string>& out_params) { 
+    if (pImpl->db == nullptr) return false; 
+
+    const std::string sql = "SELECT param_key, param_value FROM training_parameters WHERE task_id = ?;"; 
+    sqlite3_stmt* stmt = pImpl->PrepareStatement(sql); 
+    if (stmt == nullptr) return false; 
+
+    sqlite3_bind_int(stmt, 1, task_id); 
+    out_params.clear(); 
+
+    while (sqlite3_step(stmt) == SQLITE_ROW) { 
+        // 修正空值判断（参数值可能为NULL）
+        std::string key = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0)); 
+        std::string value = (sqlite3_column_type(stmt, 1) != SQLITE_NULL) ? reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1)) : ""; 
+        out_params[key] = value; 
+    }
+
+    sqlite3_finalize(stmt); 
+    return true; 
+}
+
+// 更新训练进度：修正"更新-插入"逻辑
+bool ChemicalMLDAO::UpdateTrainingProgress(int task_id, float progress, const std::string& update_time) { 
+    if (pImpl->db == nullptr) return false; 
+
+    // 1. 尝试更新现有进度
+    const std::string update_sql = R"(
+        UPDATE training_progress
+        SET progress_percentage = ?, last_update_time = ?
+        WHERE task_id = ?;
+    )";
+    sqlite3_stmt* stmt = pImpl->PrepareStatement(update_sql); 
+    if (stmt == nullptr) return false; 
+
+    sqlite3_bind_double(stmt, 1, progress); 
+    sqlite3_bind_text(stmt, 2, update_time.c_str(), -1, SQLITE_TRANSIENT); 
+    sqlite3_bind_int(stmt, 3, task_id); 
+
+    int rc = sqlite3_step(stmt); 
+    sqlite3_finalize(stmt); 
+
+    // 若更新成功（影响行数>0），直接返回
+    if (rc == SQLITE_DONE && sqlite3_changes(pImpl->db) > 0) { 
+        return true; 
+    }
+
+    // 2. 无现有记录，插入新进度
+    const std::string insert_sql = R"(
+        INSERT INTO training_progress (task_id, progress_percentage, last_update_time)
+        VALUES (?, ?, ?);
+    )";
+    stmt = pImpl->PrepareStatement(insert_sql); 
+    if (stmt == nullptr) return false; 
+
+    sqlite3_bind_int(stmt, 1, task_id); 
+    sqlite3_bind_double(stmt, 2, progress); 
+    sqlite3_bind_text(stmt, 3, update_time.c_str(), -1, SQLITE_TRANSIENT); 
+
+    rc = sqlite3_step(stmt); 
+    sqlite3_finalize(stmt); 
+    return (rc == SQLITE_DONE); 
+}
+
+// 获取训练进度：修正字段读取、空值处理
+bool ChemicalMLDAO::GetTrainingProgress(int task_id, TrainingProgress& out_progress) { 
+    if (pImpl->db == nullptr) return false; 
+
+    const std::string sql = R"(
+        SELECT progress_percentage, last_update_time
+        FROM training_progress WHERE task_id = ? LIMIT 1;
+    )";
+    sqlite3_stmt* stmt = pImpl->PrepareStatement(sql); 
+    if (stmt == nullptr) return false; 
+
+    sqlite3_bind_int(stmt, 1, task_id); 
+    int rc = sqlite3_step(stmt); 
+
+    if (rc == SQLITE_ROW) { 
+        out_progress.task_id = task_id; 
+        out_progress.progress_percentage = static_cast<float>(sqlite3_column_double(stmt, 0)); 
+        out_progress.last_update_time = (sqlite3_column_type(stmt, 1) != SQLITE_NULL) ? reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1)) : ""; 
+
+        sqlite3_finalize(stmt); 
+        return true; 
+    }
+
+    sqlite3_finalize(stmt); 
+    return false; 
+}
+
+// 创建数据集：修正参数绑定、SQL语法
+bool ChemicalMLDAO::CreateDataset(const Dataset& dataset) { 
+    if (pImpl->db == nullptr) return false; 
+
+    const std::string sql = "INSERT INTO datasets (name, path, description) VALUES (?, ?, ?);"; 
+    sqlite3_stmt* stmt = pImpl->PrepareStatement(sql); 
+    if (stmt == nullptr) return false; 
+
+    // 绑定参数（修正空值处理）
+    sqlite3_bind_text(stmt, 1, dataset.name.c_str(), -1, SQLITE_TRANSIENT); 
+    sqlite3_bind_text(stmt, 2, dataset.path.c_str(), -1, SQLITE_TRANSIENT); 
+    sqlite3_bind_text(stmt, 3, dataset.description.c_str(), -1, SQLITE_TRANSIENT); 
+
+    int rc = sqlite3_step(stmt); 
+    sqlite3_finalize(stmt); 
+    return (rc == SQLITE_DONE); 
+}
+
+// 获取单数据集：修正字段读取
+bool ChemicalMLDAO::GetDataset(int dataset_id, Dataset& out_dataset) { 
+    if (pImpl->db == nullptr) return false; 
+
+    const std::string sql = "SELECT id, name, path, description FROM datasets WHERE id = ? LIMIT 1;"; 
+    sqlite3_stmt* stmt = pImpl->PrepareStatement(sql); 
+    if (stmt == nullptr) return false; 
+
+    sqlite3_bind_int(stmt, 1, dataset_id); 
+    int rc = sqlite3_step(stmt); 
+
+    if (rc == SQLITE_ROW) { 
+        out_dataset.id = sqlite3_column_int(stmt, 0); 
+        out_dataset.name = (sqlite3_column_text(stmt, 1) != nullptr) ? reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1)) : ""; 
+        out_dataset.path = (sqlite3_column_text(stmt, 2) != nullptr) ? reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2)) : ""; 
+        out_dataset.description = (sqlite3_column_type(stmt, 3) != SQLITE_NULL) ? reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3)) : ""; 
+
+        sqlite3_finalize(stmt); 
+        return true; 
+    }
+
+    sqlite3_finalize(stmt); 
+    return false; 
+}
+
+// 列表查询数据集：修正字段读取
+bool ChemicalMLDAO::ListDatasets(std::vector<Dataset>& out_datasets) { 
+    if (pImpl->db == nullptr) return false; 
+
+    const std::string sql = "SELECT id, name, path, description FROM datasets ORDER BY id DESC;"; 
+    sqlite3_stmt* stmt = pImpl->PrepareStatement(sql); 
+    if (stmt == nullptr) return false; 
+
+    out_datasets.clear(); 
+    while (sqlite3_step(stmt) == SQLITE_ROW) { 
+        Dataset ds; 
+        ds.id = sqlite3_column_int(stmt, 0); 
+        ds.name = (sqlite3_column_text(stmt, 1) != nullptr) ? reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1)) : ""; 
+        ds.path = (sqlite3_column_text(stmt, 2) != nullptr) ? reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2)) : ""; 
+        ds.description = (sqlite3_column_type(stmt, 3) != SQLITE_NULL) ? reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3)) : ""; 
+
+        out_datasets.emplace_back(std::move(ds)); 
+    }
+
+    sqlite3_finalize(stmt); 
+    return true; 
+}
+
+// 创建模型版本：修正参数绑定
+bool ChemicalMLDAO::CreateModelVersion(const ModelVersion& model_ver) { 
+    if (pImpl->db == nullptr) return false; 
+
+    const std::string sql = "INSERT INTO model_versions (version_name, create_time, description) VALUES (?, ?, ?);"; 
+    sqlite3_stmt* stmt = pImpl->PrepareStatement(sql); 
+    if (stmt == nullptr) return false; 
+
+    sqlite3_bind_text(stmt, 1, model_ver.version_name.c_str(), -1, SQLITE_TRANSIENT); 
+    sqlite3_bind_text(stmt, 2, model_ver.create_time.c_str(), -1, SQLITE_TRANSIENT); 
+    sqlite3_bind_text(stmt, 3, model_ver.description.c_str(), -1, SQLITE_TRANSIENT); 
+
+    int rc = sqlite3_step(stmt); 
+    sqlite3_finalize(stmt); 
+    return (rc == SQLITE_DONE); 
+}
+
+// 获取单模型版本：修正字段读取
+bool ChemicalMLDAO::GetModelVersion(int version_id, ModelVersion& out_model_ver) { 
+    if (pImpl->db == nullptr) return false; 
+
+    const std::string sql = "SELECT id, version_name, create_time, description FROM model_versions WHERE id = ? LIMIT 1;"; 
+    sqlite3_stmt* stmt = pImpl->PrepareStatement(sql); 
+    if (stmt == nullptr) return false; 
+
+    sqlite3_bind_int(stmt, 1, version_id); 
+    int rc = sqlite3_step(stmt); 
+
+    if (rc == SQLITE_ROW) { 
+        out_model_ver.id = sqlite3_column_int(stmt, 0); 
+        out_model_ver.version_name = (sqlite3_column_text(stmt, 1) != nullptr) ? reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1)) : ""; 
+        out_model_ver.create_time = (sqlite3_column_text(stmt, 2) != nullptr) ? reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2)) : ""; 
+        out_model_ver.description = (sqlite3_column_type(stmt, 3) != SQLITE_NULL) ? reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3)) : ""; 
+
+        sqlite3_finalize(stmt); 
+        return true; 
+    }
+
+    sqlite3_finalize(stmt); 
+    return false; 
+}
+
+// 列表查询模型版本：修正字段读取、清空结果集
+bool ChemicalMLDAO::ListModelVersions(std::vector<ModelVersion>& out_model_vers) { 
+    if (pImpl->db == nullptr) return false; 
+
+    const std::string sql = "SELECT id, version_name, create_time, description FROM model_versions ORDER BY id DESC;"; 
+    sqlite3_stmt* stmt = pImpl->PrepareStatement(sql); 
+    if (stmt == nullptr) return false; 
+
+    out_model_vers.clear();  // 修正：先清空结果集
+    while (sqlite3_step(stmt) == SQLITE_ROW) { 
+        ModelVersion mv; 
+        mv.id = sqlite3_column_int(stmt, 0); 
+        mv.version_name = (sqlite3_column_text(stmt, 1) != nullptr) ? reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1)) : ""; 
+        mv.create_time = (sqlite3_column_text(stmt, 2) != nullptr) ? reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2)) : ""; 
+        mv.description = (sqlite3_column_type(stmt, 3) != SQLITE_NULL) ? reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3)) : ""; 
+
+        out_model_vers.emplace_back(std::move(mv)); 
+    }
+
+    sqlite3_finalize(stmt); 
+    return true; 
+}
+
+// 更新错误日志：修正参数绑定
+bool ChemicalMLDAO::UpdateTrainingErrorLog(int task_id, const std::string& error_log) { 
+    if (pImpl->db == nullptr) return false; 
+
+    const std::string sql = "UPDATE training_tasks SET error_log = ? WHERE id = ?;"; 
+    sqlite3_stmt* stmt = pImpl->PrepareStatement(sql); 
+    if (stmt == nullptr) return false; 
+
+    sqlite3_bind_text(stmt, 1, error_log.c_str(), -1, SQLITE_TRANSIENT); 
+    sqlite3_bind_int(stmt, 2, task_id); 
+
+    int rc = sqlite3_step(stmt); 
+    sqlite3_finalize(stmt); 
+    return (rc == SQLITE_DONE); 
+}
+
+// 获取错误日志：修正字段读取、空值处理
+bool ChemicalMLDAO::GetTrainingErrorLog(int task_id, std::string& out_error_log) { 
+    if (pImpl->db == nullptr) return false; 
+
+    const std::string sql = "SELECT error_log FROM training_tasks WHERE id = ? LIMIT 1;"; 
+    sqlite3_stmt* stmt = pImpl->PrepareStatement(sql); 
+    if (stmt == nullptr) return false; 
+
+    sqlite3_bind_int(stmt, 1, task_id); 
+    int rc = sqlite3_step(stmt); 
+
+    if (rc == SQLITE_ROW) { 
+        out_error_log = (sqlite3_column_type(stmt, 0) != SQLITE_NULL) ? reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0)) : ""; 
+        sqlite3_finalize(stmt); 
+        return true; 
+    }
+
+    sqlite3_finalize(stmt); 
+    return false; 
+}
