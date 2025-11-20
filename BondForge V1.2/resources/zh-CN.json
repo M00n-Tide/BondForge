@@ -1,0 +1,49 @@
+{
+  "error": {
+    "no_upload_permission": "无上传权限",
+    "data_format_validation_failed": "数据格式校验失败",
+    "tag_validation_failed": "标签校验失败",
+    "category_validation_failed": "分类校验失败",
+    "data_id_exists": "数据ID已存在",
+    "data_not_found": "数据不存在",
+    "no_deletion_permission": "无删除权限",
+    "no_edit_permission": "无编辑权限",
+    "no_access_permission": "无访问权限",
+    "cannot_modify_tags": "无权限修改标签",
+    "cannot_modify_category": "无权限修改分类",
+    "invalid_tag_format": "标签格式非法",
+    "not_admin": "非管理员无权限设置用户角色",
+    "unsupported_format_conversion": "暂不支持的格式转换"
+  },
+  "category": {
+    "organic": "有机",
+    "inorganic": "无机",
+    "polymer": "高分子",
+    "catalyst": "催化剂",
+    "nanomaterial": "纳米材料",
+    "pharmaceutical_chemistry": "药物化学",
+    "public": "公开"
+  },
+  "status": {
+    "pending": "等待中",
+    "running": "运行中",
+    "completed": "已完成",
+    "failed": "失败"
+  },
+  "ui": {
+    "welcome": "欢迎使用化学机器学习系统",
+    "upload_data": "上传数据",
+    "manage_data": "管理数据",
+    "training_tasks": "训练任务",
+    "model_versions": "模型版本",
+    "datasets": "数据集",
+    "language": "语言",
+    "chinese": "中文",
+    "english": "English"
+  },
+  "role": {
+    "admin": "管理员",
+    "user": "用户",
+    "guest": "访客"
+  }
+}

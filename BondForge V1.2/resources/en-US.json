@@ -1,0 +1,49 @@
+{
+  "error": {
+    "no_upload_permission": "No upload permission",
+    "data_format_validation_failed": "Data format validation failed",
+    "tag_validation_failed": "Tag validation failed",
+    "category_validation_failed": "Category validation failed",
+    "data_id_exists": "Data ID already exists",
+    "data_not_found": "Data not found",
+    "no_deletion_permission": "No deletion permission",
+    "no_edit_permission": "No edit permission",
+    "no_access_permission": "No access permission",
+    "cannot_modify_tags": "No permission to modify tags",
+    "cannot_modify_category": "No permission to modify category",
+    "invalid_tag_format": "Invalid tag format",
+    "not_admin": "Only administrators can set user roles",
+    "unsupported_format_conversion": "Unsupported format conversion"
+  },
+  "category": {
+    "organic": "Organic",
+    "inorganic": "Inorganic",
+    "polymer": "Polymer",
+    "catalyst": "Catalyst",
+    "nanomaterial": "Nanomaterial",
+    "pharmaceutical_chemistry": "Pharmaceutical Chemistry",
+    "public": "Public"
+  },
+  "status": {
+    "pending": "Pending",
+    "running": "Running",
+    "completed": "Completed",
+    "failed": "Failed"
+  },
+  "ui": {
+    "welcome": "Welcome to Chemical Machine Learning System",
+    "upload_data": "Upload Data",
+    "manage_data": "Manage Data",
+    "training_tasks": "Training Tasks",
+    "model_versions": "Model Versions",
+    "datasets": "Datasets",
+    "language": "Language",
+    "chinese": "中文",
+    "english": "English"
+  },
+  "role": {
+    "admin": "Administrator",
+    "user": "User",
+    "guest": "Guest"
+  }
+}
