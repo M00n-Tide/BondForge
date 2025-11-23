@@ -1,0 +1,158 @@
+{
+    "molecules": [
+        {
+            "id": "mol001",
+            "name": "Benzene",
+            "formula": "C6H6",
+            "smiles": "c1ccccc1",
+            "molecular_weight": 78.11,
+            "properties": {
+                "boiling_point": 80.1,
+                "melting_point": 5.5,
+                "density": 0.879,
+                "solubility": 1.79,
+                "logp": 2.13,
+                "polar_surface_area": 0.0
+            },
+            "description": "Aromatic hydrocarbon with a six-membered ring",
+            "file_path": "molecules/benzene.sdf",
+            "image_path": "molecules/benzene.png"
+        },
+        {
+            "id": "mol002",
+            "name": "Aspirin",
+            "formula": "C9H8O4",
+            "smiles": "CC(=O)OC1=CC=CC=C1C(=O)O",
+            "molecular_weight": 180.16,
+            "properties": {
+                "boiling_point": 140,
+                "melting_point": 136,
+                "density": 1.40,
+                "solubility": 0.0023,
+                "logp": 1.19,
+                "polar_surface_area": 63.6
+            },
+            "description": "Acetylsalicylic acid, a common pain reliever",
+            "file_path": "molecules/aspirin.sdf",
+            "image_path": "molecules/aspirin.png"
+        },
+        {
+            "id": "mol003",
+            "name": "Caffeine",
+            "formula": "C8H10N4O2",
+            "smiles": "CN1C=NC2=C1C(=O)N(C(=O)N2C)C",
+            "molecular_weight": 194.19,
+            "properties": {
+                "boiling_point": 178,
+                "melting_point": 236,
+                "density": 1.23,
+                "solubility": 20.0,
+                "logp": -0.07,
+                "polar_surface_area": 58.4
+            },
+            "description": "Natural stimulant found in coffee and tea",
+            "file_path": "molecules/caffeine.mol",
+            "image_path": "molecules/caffeine.png"
+        }
+    ],
+    "datasets": [
+        {
+            "id": "dataset001",
+            "name": "Molecular Properties Dataset",
+            "description": "A collection of molecules with their calculated properties",
+            "file_path": "data/molecular_properties.csv",
+            "format": "CSV",
+            "columns": [
+                {"name": "id", "type": "string"},
+                {"name": "name", "type": "string"},
+                {"name": "formula", "type": "string"},
+                {"name": "smiles", "type": "string"},
+                {"name": "molecular_weight", "type": "float"},
+                {"name": "logp", "type": "float"},
+                {"name": "solubility", "type": "float"},
+                {"name": "toxicity", "type": "float"}
+            ],
+            "size": 156,
+            "use_cases": ["property prediction", "QSAR modeling"]
+        },
+        {
+            "id": "dataset002",
+            "name": "Solubility Dataset",
+            "description": "Experimental water solubility values for various compounds",
+            "file_path": "data/solubility_data.csv",
+            "format": "CSV",
+            "columns": [
+                {"name": "compound_id", "type": "string"},
+                {"name": "compound_name", "type": "string"},
+                {"name": "smiles", "type": "string"},
+                {"name": "experimental_solubility", "type": "float"},
+                {"name": "temperature", "type": "float"},
+                {"name": "units", "type": "string"}
+            ],
+            "size": 287,
+            "use_cases": ["solubility prediction", "drug discovery"]
+        },
+        {
+            "id": "dataset003",
+            "name": "Protein Sequences",
+            "description": "Sample protein sequences for analysis",
+            "file_path": "data/protein_sequences.fasta",
+            "format": "FASTA",
+            "size": 12,
+            "use_cases": ["protein modeling", "docking studies"]
+        }
+    ],
+    "models": [
+        {
+            "id": "model001",
+            "name": "Linear Regression Example",
+            "type": "regression",
+            "algorithm": "linear_regression",
+            "description": "Simple linear regression model for molecular weight prediction",
+            "file_path": "models/linear_regression_example.json",
+            "features": ["num_carbon", "num_hydrogen", "num_nitrogen", "num_oxygen"],
+            "target": "molecular_weight",
+            "metrics": {
+                "r2_score": 0.94,
+                "mse": 45.2
+            },
+            "created_date": "2023-10-15",
+            "training_data": "dataset001"
+        },
+        {
+            "id": "model002",
+            "name": "Random Forest Solubility",
+            "type": "regression",
+            "algorithm": "random_forest",
+            "description": "Random forest model for water solubility prediction",
+            "features": ["logp", "polar_surface_area", "molecular_weight", "rotatable_bonds"],
+            "target": "solubility",
+            "metrics": {
+                "r2_score": 0.87,
+                "mse": 0.34
+            },
+            "created_date": "2023-11-02",
+            "training_data": "dataset002"
+        }
+    ],
+    "projects": [
+        {
+            "id": "project001",
+            "name": "Drug Discovery Example",
+            "description": "Example project demonstrating the drug discovery workflow",
+            "file_path": "projects/drug_discovery_project.json",
+            "goal": "Identify potential drug candidates for target protein X",
+            "workflow": [
+                {"step": 1, "action": "target_analysis", "description": "Analyze target protein structure"},
+                {"step": 2, "action": "screening", "description": "Screen compound library"},
+                {"step": 3, "action": "docking", "description": "Molecular docking of top candidates"},
+                {"step": 4, "action": "ml_prediction", "description": "Predict properties using ML models"},
+                {"step": 5, "action": "selection", "description": "Select best candidates for testing"}
+            ],
+            "datasets": ["dataset001", "dataset002"],
+            "models": ["model001", "model002"],
+            "created_date": "2023-09-20",
+            "last_modified": "2023-11-15"
+        }
+    ]
+}

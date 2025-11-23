@@ -1,0 +1,292 @@
+{
+    "app": {
+        "name": "BondForge",
+        "version": "2.0.0",
+        "language": "en",
+        "theme": "light",
+        "auto_save_interval": 300
+    },
+    "data": {
+        "default_format": "JSON",
+        "auto_save": true,
+        "backup_enabled": true,
+        "backup_interval": 24,
+        "max_records_per_page": 50,
+        "search_threshold": 0.8
+    },
+    "visualization": {
+        "default_renderer": "simple",
+        "show_hydrogens": true,
+        "show_atom_labels": true,
+        "default_background": "#ffffff",
+        "default_bond_width": 2,
+        "default_atom_size": 12
+    },
+    "ml": {
+        "default_algorithm": "linear_regression",
+        "use_gpu": false,
+        "model_dir": "./models",
+        "max_training_time": 3600,
+        "validation_split": 0.2,
+        "random_seed": 42
+    },
+    "collaboration": {
+        "auto_refresh": true,
+        "notification_enabled": true,
+        "default_share_expiry": "30_days",
+        "max_concurrent_users": 10,
+        "conflict_resolution": "latest_wins"
+    },
+    "network": {
+        "server_url": "https://api.bondforge.com",
+        "timeout": 30,
+        "retry_attempts": 3,
+        "api_version": "v2"
+    },
+    "database": {
+        "type": "sqlite",
+        "path": "./data/bondforge.db",
+        "connection_pool_size": 5,
+        "backup_enabled": true,
+        "backup_path": "./data/backup/"
+    },
+    "security": {
+        "require_password_change": false,
+        "session_timeout": 120,
+        "two_factor_enabled": false,
+        "password_min_length": 8,
+        "password_complexity": "medium"
+    },
+    "plugins": {
+        "directory": "./plugins",
+        "auto_load": true,
+        "allowed_extensions": [".dll", ".so", ".dylib"],
+        "sandbox_enabled": true
+    },
+    "logging": {
+        "level": "info",
+        "file_path": "./logs/bondforge.log",
+        "max_file_size": "10MB",
+        "max_files": 5,
+        "console_output": true
+    },
+    "update": {
+        "version": "2.0.0",
+        "lastUpdated": "2023-11-23T12:00:00Z",
+        "autoUpdateEnabled": true,
+        "scheduler": {
+            "enabled": true,
+            "intervalHours": 24,
+            "maxConcurrentTasks": 3,
+            "maxRetryAttempts": 3,
+            "retryIntervalSeconds": 300,
+            "taskTimeoutSeconds": 3600,
+            "maintenanceIntervalMinutes": 60
+        },
+        "dataSources": [
+            {
+                "id": "molecular_database",
+                "name": "Molecular Properties Database",
+                "description": "Database of molecular properties and structures",
+                "type": "MolecularData",
+                "version": "2.0.1",
+                "updateUrl": "https://api.bondforge.org/updates/molecular_database.json",
+                "checksumUrl": "https://api.bondforge.org/updates/molecular_database.sha256",
+                "localPath": "{APPDATA}/data/molecular_data.db",
+                "lastUpdate": "2023-11-15T10:30:00Z",
+                "nextCheck": "2023-12-15T10:30:00Z",
+                "checkIntervalDays": 30,
+                "autoUpdate": true,
+                "critical": false,
+                "metadata": {
+                    "provider": "BondForge Team",
+                    "license": "CC BY-SA 4.0",
+                    "recordCount": 125000,
+                    "sizeMB": 245,
+                    "tags": ["molecules", "properties", "structures"],
+                    "fields": [
+                        {"name": "id", "type": "string", "description": "Unique identifier"},
+                        {"name": "name", "type": "string", "description": "Common name"},
+                        {"name": "formula", "type": "string", "description": "Molecular formula"},
+                        {"name": "smiles", "type": "string", "description": "SMILES notation"},
+                        {"name": "molecular_weight", "type": "float", "description": "Molecular weight in g/mol"},
+                        {"name": "logp", "type": "float", "description": "Octanol-water partition coefficient"},
+                        {"name": "solubility", "type": "float", "description": "Water solubility in mg/L"},
+                        {"name": "toxicity", "type": "float", "description": "Toxicity level (0-1)"}
+                    ],
+                    "statistics": {
+                        "averageMolecularWeight": 256.3,
+                        "averageLogP": 2.1,
+                        "averageSolubility": 0.45,
+                        "toxicityDistribution": {
+                            "low": 0.65,
+                            "medium": 0.25,
+                            "high": 0.1
+                        }
+                    }
+                }
+            },
+            {
+                "id": "ml_models",
+                "name": "Machine Learning Models",
+                "description": "Pre-trained ML models for chemical property prediction",
+                "type": "MLModels",
+                "version": "2.0.3",
+                "updateUrl": "https://api.bondforge.org/updates/ml_models.json",
+                "checksumUrl": "https://api.bondforge.org/updates/ml_models.sha256",
+                "localPath": "{APPDATA}/models/",
+                "lastUpdate": "2023-11-10T14:20:00Z",
+                "nextCheck": "2024-01-10T14:20:00Z",
+                "checkIntervalDays": 60,
+                "autoUpdate": true,
+                "critical": false,
+                "metadata": {
+                    "provider": "BondForge ML Team",
+                    "license": "MIT",
+                    "modelCount": 12,
+                    "sizeMB": 180,
+                    "tags": ["models", "machine learning", "prediction"],
+                    "models": [
+                        {
+                            "name": "solubility_predictor",
+                            "type": "regression",
+                            "algorithm": "random_forest",
+                            "accuracy": 0.92,
+                            "description": "Predicts water solubility from molecular structure"
+                        },
+                        {
+                            "name": "toxicity_classifier",
+                            "type": "classification",
+                            "algorithm": "neural_network",
+                            "accuracy": 0.87,
+                            "description": "Classifies compounds into toxicity categories"
+                        },
+                        {
+                            "name": "binding_affinity_predictor",
+                            "type": "regression",
+                            "algorithm": "gradient_boosting",
+                            "accuracy": 0.85,
+                            "description": "Predicts binding affinity to target proteins"
+                        }
+                    ],
+                    "statistics": {
+                        "averageAccuracy": 0.88,
+                        "mostUsedModel": "solubility_predictor",
+                        "updateFrequency": "bimonthly"
+                    }
+                }
+            },
+            {
+                "id": "chemical_database",
+                "name": "Chemical Reactions Database",
+                "description": "Database of chemical reactions and pathways",
+                "type": "ChemicalDatabases",
+                "version": "2.0.0",
+                "updateUrl": "https://api.bondforge.org/updates/chemical_database.json",
+                "checksumUrl": "https://api.bondforge.org/updates/chemical_database.sha256",
+                "localPath": "{APPDATA}/data/chemical_reactions.db",
+                "lastUpdate": "2023-10-05T09:15:00Z",
+                "nextCheck": "2024-01-05T09:15:00Z",
+                "checkIntervalDays": 90,
+                "autoUpdate": true,
+                "critical": false,
+                "metadata": {
+                    "provider": "Chemistry Data Consortium",
+                    "license": "CC BY 4.0",
+                    "reactionCount": 85000,
+                    "sizeMB": 320,
+                    "tags": ["reactions", "pathways", "synthesis"],
+                    "reactionTypes": [
+                        {"name": "substitution", "count": 35000},
+                        {"name": "addition", "count": 22000},
+                        {"name": "elimination", "count": 15000},
+                        {"name": "rearrangement", "count": 8000},
+                        {"name": "oxidation", "count": 5000}
+                    ],
+                    "statistics": {
+                        "averageYield": 0.76,
+                        "mostCommonReactants": ["benzene", "acetone", "ethanol"],
+                        "updateFrequency": "quarterly"
+                    }
+                }
+            },
+            {
+                "id": "reference_data",
+                "name": "Reference Data",
+                "description": "Reference data for chemical standards and regulations",
+                "type": "ReferenceData",
+                "version": "2.1.0",
+                "updateUrl": "https://api.bondforge.org/updates/reference_data.json",
+                "checksumUrl": "https://api.bondforge.org/updates/reference_data.sha256",
+                "localPath": "{APPDATA}/data/reference_data.json",
+                "lastUpdate": "2023-09-20T16:45:00Z",
+                "nextCheck": "2024-03-20T16:45:00Z",
+                "checkIntervalDays": 180,
+                "autoUpdate": false,
+                "critical": false,
+                "metadata": {
+                    "provider": "Regulatory Affairs Institute",
+                    "license": "Custom",
+                    "standardCount": 1250,
+                    "sizeMB": 15,
+                    "tags": ["standards", "regulations", "safety"],
+                    "categories": [
+                        {
+                            "name": "safety",
+                            "standards": 450,
+                            "description": "Chemical safety standards"
+                        },
+                        {
+                            "name": "environmental",
+                            "standards": 320,
+                            "description": "Environmental regulations"
+                        },
+                        {
+                            "name": "transport",
+                            "standards": 280,
+                            "description": "Transport regulations"
+                        },
+                        {
+                            "name": "workplace",
+                            "standards": 200,
+                            "description": "Workplace exposure limits"
+                        }
+                    ],
+                    "statistics": {
+                        "averageUpdateFrequency": "biannual",
+                        "lastMajorUpdate": "2023-09-20",
+                        "nextMajorUpdate": "2024-03-20"
+                    }
+                }
+            }
+        ],
+        "cache": {
+            "enabled": true,
+            "maxSizeMB": 500,
+            "defaultTtlHours": 24,
+            "cleanupIntervalHours": 24,
+            "path": "{APPDATA}/cache"
+        },
+        "notifications": {
+            "enabled": true,
+            "showProgress": true,
+            "showCompleted": true,
+            "showFailed": true,
+            "showScheduled": false,
+            "soundEnabled": false,
+            "emailEnabled": false,
+            "smtpServer": "",
+            "smtpPort": 587,
+            "emailUser": "",
+            "recipients": []
+        },
+        "backup": {
+            "enabled": true,
+            "beforeUpdate": true,
+            "maxBackups": 5,
+            "path": "{APPDATA}/backup",
+            "compressionEnabled": true,
+            "compressionLevel": 5
+        }
+    }
+}

@@ -1,0 +1,131 @@
+{
+  "project_name": "Example Drug Discovery Project",
+  "project_version": "1.0.0",
+  "creation_date": "2023-11-23",
+  "last_modified": "2023-11-23",
+  "description": "Example project demonstrating drug discovery workflow with BondForge",
+  "author": "BondForge Team",
+  "tags": ["drug_discovery", "molecule_optimization", "qsar"],
+  "steps": [
+    {
+      "step_id": 1,
+      "step_name": "Data Collection",
+      "description": "Collect and curate molecular dataset for analysis",
+      "status": "completed",
+      "files": [
+        "examples/data/molecular_properties.csv",
+        "examples/data/solubility_data.csv"
+      ],
+      "notes": [
+        "Collected 1000 molecules with diverse chemical properties",
+        "Data includes SMILES strings and experimental measurements"
+      ]
+    },
+    {
+      "step_id": 2,
+      "step_name": "Molecule Visualization",
+      "description": "Visualize and analyze molecular structures",
+      "status": "completed",
+      "files": [
+        "examples/molecules/benzene.sdf",
+        "examples/molecules/caffeine.mol",
+        "examples/molecules/aspirin.sdf"
+      ],
+      "notes": [
+        "Analyzed representative molecules",
+        "Identified key structural features for solubility"
+      ]
+    },
+    {
+      "step_id": 3,
+      "step_name": "Feature Engineering",
+      "description": "Calculate molecular descriptors and engineer features",
+      "status": "completed",
+      "files": [],
+      "notes": [
+        "Calculated molecular weight, LogP, TPSA, and other descriptors",
+        "Applied feature scaling and normalization"
+      ]
+    },
+    {
+      "step_id": 4,
+      "step_name": "Model Training",
+      "description": "Train machine learning model for property prediction",
+      "status": "completed",
+      "files": [
+        "examples/models/linear_regression_example.json"
+      ],
+      "notes": [
+        "Trained linear regression model",
+        "Achieved R² score of 0.78 on validation set"
+      ]
+    },
+    {
+      "step_id": 5,
+      "step_name": "Model Evaluation",
+      "description": "Evaluate model performance and validate predictions",
+      "status": "in_progress",
+      "files": [],
+      "notes": [
+        "Evaluation in progress",
+        "Need to test on external validation set"
+      ]
+    },
+    {
+      "step_id": 6,
+      "step_name": "Results Analysis",
+      "description": "Analyze results and generate report",
+      "status": "pending",
+      "files": [],
+      "notes": []
+    }
+  ],
+  "collaborators": [
+    {
+      "name": "Alice Smith",
+      "email": "alice.smith@example.com",
+      "role": "Principal Investigator",
+      "department": "Chemistry",
+      "contributions": [
+        "Data collection",
+        "Feature selection"
+      ]
+    },
+    {
+      "name": "Bob Johnson",
+      "email": "bob.johnson@example.com",
+      "role": "Data Scientist",
+      "department": "Computer Science",
+      "contributions": [
+        "Model development",
+        "Validation"
+      ]
+    }
+  ],
+  "references": [
+    {
+      "title": "Molecular descriptors for QSAR/QSPR",
+      "authors": ["Todeschini, R.", "Consonni, V."],
+      "journal": "Chemometrics and Intelligent Laboratory Systems",
+      "year": 2000,
+      "doi": "10.1016/s0169-7439(00)00018-2"
+    },
+    {
+      "title": "AQUEOUS SOLUBILITY - PREDICTION AND ARTIFICIAL INTELLIGENCE-BASED DESIGN",
+      "authors": ["Yalkowsky, S.H.", "Valvani, P."],
+      "journal": "Journal of Pharmaceutical Sciences",
+      "year": 1980,
+      "doi": "10.1002/jps.260069022"
+    }
+  ],
+  "conclusions": [
+    "Linear regression provides a baseline model for solubility prediction",
+    "Molecular weight and LogP are the most influential features",
+    "More complex models may improve prediction accuracy"
+  ],
+  "future_work": [
+    "Explore more advanced machine learning algorithms",
+    "Incorporate temperature-dependent solubility data",
+    "Expand dataset to include more diverse chemical classes"
+  ]
+}

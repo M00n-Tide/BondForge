@@ -1,0 +1,125 @@
+{
+    "name": "Example Plugin",
+    "version": "1.0.0",
+    "description": "A comprehensive example plugin for BondForge demonstrating UI integration and chemical calculations",
+    "author": "BondForge Team",
+    "website": "https://bondforge.org",
+    "license": "MIT",
+    "url": "https://github.com/bondforge/example-plugin",
+    "dependencies": [],
+    "extensions": ["molecular_calc", "solubility_predict", "image_gen"],
+    "platforms": ["Windows", "Linux", "macOS"],
+    "min_bondforge_version": "2.0.0",
+    "commands": [
+        {
+            "name": "show_message",
+            "description": "Shows a message box with the specified text",
+            "parameters": [
+                {
+                    "name": "message",
+                    "type": "string",
+                    "required": false,
+                    "default": "Hello from Example Plugin!",
+                    "description": "Message text to display"
+                }
+            ]
+        },
+        {
+            "name": "add_menu_item",
+            "description": "Adds a new menu item to the tools menu",
+            "parameters": [
+                {
+                    "name": "title",
+                    "type": "string",
+                    "required": false,
+                    "default": "Example Action",
+                    "description": "Title of the menu item"
+                }
+            ]
+        },
+        {
+            "name": "get_info",
+            "description": "Returns information about the plugin",
+            "parameters": []
+        },
+        {
+            "name": "generate_uuid",
+            "description": "Generates a new UUID",
+            "parameters": []
+        },
+        {
+            "name": "molecular_calc",
+            "description": "Calculates molecular weight from chemical formula",
+            "parameters": [
+                {
+                    "name": "formula",
+                    "type": "string",
+                    "required": true,
+                    "description": "Chemical formula (e.g., C6H12O6)"
+                }
+            ]
+        },
+        {
+            "name": "solubility_predict",
+            "description": "Predicts solubility based on molecular properties",
+            "parameters": [
+                {
+                    "name": "properties",
+                    "type": "object",
+                    "required": true,
+                    "description": "Molecular properties including logp, polar_surface_area, molecular_weight"
+                }
+            ]
+        },
+        {
+            "name": "image_gen",
+            "description": "Generates molecular structure image from SMILES",
+            "parameters": [
+                {
+                    "name": "smiles",
+                    "type": "string",
+                    "required": true,
+                    "description": "SMILES notation of the molecule"
+                },
+                {
+                    "name": "format",
+                    "type": "string",
+                    "required": false,
+                    "default": "png",
+                    "description": "Image format (png, svg, etc.)"
+                }
+            ]
+        }
+    ],
+    "configuration": {
+        "type": "dialog",
+        "options": [
+            {
+                "name": "auto_run",
+                "type": "boolean",
+                "default": false,
+                "description": "Automatically run plugin on startup"
+            },
+            {
+                "name": "interval",
+                "type": "integer",
+                "default": 5,
+                "min": 1,
+                "max": 60,
+                "description": "Queue processing interval in seconds"
+            },
+            {
+                "name": "image_resolution",
+                "type": "integer",
+                "default": 300,
+                "min": 100,
+                "max": 1000,
+                "description": "Generated image resolution in DPI"
+            }
+        ]
+    },
+    "resources": {
+        "icon": ":/icons/example_plugin.png",
+        "stylesheet": "styles/example_plugin.qss"
+    }
+}

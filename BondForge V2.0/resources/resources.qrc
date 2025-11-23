@@ -1,0 +1,22 @@
+<RCC>
+    <qresource prefix="/">
+        <file>icons/bondforge.png</file>
+        <file>icons/add.png</file>
+        <file>icons/edit.png</file>
+        <file>icons/delete.png</file>
+        <file>icons/import.png</file>
+        <file>icons/export.png</file>
+        <file>icons/save.png</file>
+        <file>icons/save-as.png</file>
+        <file>icons/open.png</file>
+        <file>icons/new.png</file>
+        <file>icons/refresh.png</file>
+        <file>icons/settings.png</file>
+        <file>icons/help.png</file>
+        <file>images/splash.png</file>
+        <file>styles/dark_theme.qss</file>
+        <file>styles/light_theme.qss</file>
+        <file>translations/bondforge_zh_CN.ts</file>
+        <file>translations/bondforge_en_US.ts</file>
+    </qresource>
+</RCC>

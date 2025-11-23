@@ -1,0 +1,89 @@
+{
+  "model_type": "linear_regression",
+  "model_name": "Solubility Prediction Model",
+  "model_version": "1.0.0",
+  "creation_date": "2023-11-23",
+  "description": "Linear regression model for predicting molecular solubility based on molecular descriptors",
+  "features": [
+    {
+      "name": "Molecular_Weight",
+      "type": "numerical",
+      "description": "Molecular weight of the compound",
+      "importance": 0.25
+    },
+    {
+      "name": "LogP",
+      "type": "numerical",
+      "description": "Octanol-water partition coefficient",
+      "importance": 0.30
+    },
+    {
+      "name": "TPSA",
+      "type": "numerical",
+      "description": "Topological Polar Surface Area",
+      "importance": 0.15
+    },
+    {
+      "name": "Num_Oxygens",
+      "type": "numerical",
+      "description": "Number of oxygen atoms",
+      "importance": 0.20
+    },
+    {
+      "name": "Num_Nitrogens",
+      "type": "numerical",
+      "description": "Number of nitrogen atoms",
+      "importance": 0.10
+    }
+  ],
+  "target": {
+    "name": "Solubility",
+    "type": "numerical",
+    "description": "Water solubility (logS)",
+    "unit": "logS"
+  },
+  "parameters": {
+    "fit_intercept": true,
+    "normalize": false,
+    "copy_X": true,
+    "n_jobs": 1
+  },
+  "coefficients": {
+    "Molecular_Weight": -0.0021,
+    "LogP": -0.56,
+    "TPSA": -0.018,
+    "Num_Oxygens": 0.25,
+    "Num_Nitrogens": -0.12
+  },
+  "intercept": 1.45,
+  "training_metrics": {
+    "R2": 0.78,
+    "MAE": 0.45,
+    "MSE": 0.31,
+    "RMSE": 0.56
+  },
+  "validation_metrics": {
+    "R2": 0.76,
+    "MAE": 0.48,
+    "MSE": 0.35,
+    "RMSE": 0.59
+  },
+  "training_data": {
+    "size": 1000,
+    "source": "molecular_properties.csv",
+    "preprocessing": [
+      "standardization",
+      "outlier_removal"
+    ]
+  },
+  "notes": [
+    "Model trained on a diverse dataset of organic compounds",
+    "Performance may vary for inorganic or highly polar molecules",
+    "Regular validation recommended for production use"
+  ],
+  "limitations": [
+    "Only applicable to small organic molecules (MW < 500)",
+    "Does not account for temperature effects",
+    "Not validated for ionic compounds"
+  ]
+}
